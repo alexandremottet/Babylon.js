@@ -281,6 +281,16 @@ export class Viewer implements IDisposable {
     public readonly onSkyboxBlurChanged = new Observable<void>();
 
     /**
+     * Fired when the environment intensity changes.
+     */
+    public readonly onEnvironmentIntensityChanged = new Observable<void>();
+
+    /**
+     * Fired when the environment rotation changes.
+     */
+    public readonly onEnvironmentRotationChanged = new Observable<void>();
+
+    /**
      * Fired when the post processing state changes.
      */
     public readonly onPostProcessingChanged = new Observable<void>();
@@ -344,6 +354,10 @@ export class Viewer implements IDisposable {
     private _modelInfo: Nullable<Model> = null;
     private _skybox: Nullable<Mesh> = null;
     private _skyboxBlur: number = 0.3;
+    private _skyboxTexture: Nullable<CubeTexture> = null;
+    private _reflectionTexture: Nullable<CubeTexture> = null;
+    private _reflectionsIntensity: number = 1;
+    private _reflectionsRotation: number = 0;
     private _light: Nullable<HemisphericLight> = null;
     private _toneMappingEnabled: boolean;
     private _toneMappingType: number;
@@ -512,6 +526,43 @@ export class Viewer implements IDisposable {
             }
             this.onSkyboxBlurChanged.notifyObservers();
         }
+    }
+
+    /**
+     * The rotation of the skybox in radians.
+     */
+    public get environmentRotation(): number {
+        return this._reflectionsRotation;
+    }
+
+    public set environmentRotation(value: number) {
+        this._reflectionsRotation = value;
+
+        if (this._skyboxTexture) {
+            this._skyboxTexture.rotationY = this._reflectionsRotation;
+        }
+        if (this._reflectionTexture) {
+            this._reflectionTexture.rotationY = this._reflectionsRotation;
+        }
+        this.onEnvironmentRotationChanged.notifyObservers();
+    }
+
+    /**
+     * The intensity of the environment lighting.
+     */
+    public get environmentIntensity(): number {
+        return this._reflectionsIntensity;
+    }
+
+    public set environmentIntensity(value: number) {
+        this._reflectionsIntensity = value;
+        if (this._skyboxTexture) {
+            this._skyboxTexture.level = this._reflectionsIntensity;
+        }
+        if (this._reflectionTexture) {
+            this._reflectionTexture.level = this._reflectionsIntensity;
+        }
+        this.onEnvironmentIntensityChanged.notifyObservers();
     }
 
     /**
@@ -925,8 +976,8 @@ export class Viewer implements IDisposable {
 
             const dispose = () => {
                 if (options.lighting) {
-                    this._scene.environmentTexture?.dispose();
-                    this._scene.environmentTexture = null;
+                    this._reflectionTexture?.dispose();
+                    this._reflectionTexture = null;
                 }
                 if (options.skybox) {
                     this._skybox?.dispose(undefined, true);
@@ -943,12 +994,16 @@ export class Viewer implements IDisposable {
                     const cubeTexture = CubeTexture.CreateFromPrefilteredData(url, this._scene);
 
                     if (options.lighting) {
-                        this._scene.environmentTexture = cubeTexture;
+                        this._reflectionTexture = cubeTexture;
+                        this._scene.environmentTexture = this._reflectionTexture;
+                        cubeTexture.level = this.environmentIntensity;
+                        cubeTexture.rotationY = this.environmentRotation;
                     }
-
                     if (options.skybox) {
-                        const reflectionTexture = options.lighting ? cubeTexture.clone() : cubeTexture;
-                        this._skybox = createSkybox(this._scene, this._camera, reflectionTexture, this.skyboxBlur);
+                        this._skyboxTexture = options.lighting ? cubeTexture.clone() : cubeTexture;
+                        this._skyboxTexture.level = this.environmentIntensity;
+                        this._skyboxTexture.rotationY = this.environmentRotation;
+                        this._skybox = createSkybox(this._scene, this._camera, this._skyboxTexture, this.skyboxBlur);
                         this._snapshotHelper.fixMeshes([this._skybox]);
                         this._scene.autoClear = false;
                     }
@@ -1030,6 +1085,8 @@ export class Viewer implements IDisposable {
         this.onEnvironmentChanged.clear();
         this.onEnvironmentError.clear();
         this.onSkyboxBlurChanged.clear();
+        this.onEnvironmentIntensityChanged.clear();
+        this.onEnvironmentRotationChanged.clear();
         this.onPostProcessingChanged.clear();
         this.onModelChanged.clear();
         this.onModelError.clear();
@@ -1220,7 +1277,7 @@ export class Viewer implements IDisposable {
             shouldHaveDefaultLight = false;
         } else {
             const hasModelProvidedLights = this._modelInfo.assetContainer.lights.length > 0;
-            const hasImageBasedLighting = !!this._scene.environmentTexture;
+            const hasImageBasedLighting = !!this._reflectionTexture;
             const hasMaterials = this._modelInfo.assetContainer.materials.length > 0;
             const hasNonPBRMaterials = this._modelInfo.assetContainer.materials.some((material) => !(material instanceof PBRMaterial));
 
