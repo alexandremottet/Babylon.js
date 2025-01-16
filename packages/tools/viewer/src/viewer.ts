@@ -373,6 +373,7 @@ export class Viewer implements IDisposable {
     private readonly _imageProcessingConfigurationObserver: Observer<ImageProcessingConfiguration>;
     private _renderLoopController: Nullable<IDisposable> = null;
     private _modelInfo: Nullable<Model> = null;
+    private _cubeTexture: Nullable<CubeTexture> = null;
     private _skybox: Nullable<Mesh> = null;
     private _skyboxBlur: number = 0.3;
     private _skyboxTexture: Nullable<CubeTexture> = null;
@@ -999,8 +1000,8 @@ export class Viewer implements IDisposable {
             locks.push(this._loadSkyboxLock);
         }
 
-        const environmentAbortController = (this._loadEnvironmentAbortController = options.lighting ? new AbortController() : null);
-        const skyboxAbortController = (this._loadSkyboxAbortController = options.skybox ? new AbortController() : null);
+        const environmentAbortController = (this._loadEnvironmentAbortController = options.lighting && this._cubeTexture ? new AbortController() : null);
+        const skyboxAbortController = (this._loadSkyboxAbortController = options.skybox && this._cubeTexture ? new AbortController() : null);
 
         await AsyncLock.LockAsync(async () => {
             throwIfAborted(abortSignal, environmentAbortController?.signal, skyboxAbortController?.signal);
@@ -1024,6 +1025,7 @@ export class Viewer implements IDisposable {
             try {
                 if (url) {
                     const cubeTexture = CubeTexture.CreateFromPrefilteredData(url, this._scene);
+                    this._cubeTexture = cubeTexture;
 
                     if (options.lighting) {
                         this._reflectionTexture = cubeTexture;
