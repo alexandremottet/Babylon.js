@@ -886,6 +886,7 @@ export class Viewer implements IDisposable {
      * @param abortSignal An optional signal that can be used to abort the loading process.
      */
     public async loadEnvironment(url: string, options?: EnvironmentOptions, abortSignal?: AbortSignal): Promise<void> {
+        console.log("loadEnvironment");
         await this._updateEnvironment(url, options, abortSignal);
     }
 
@@ -895,6 +896,7 @@ export class Viewer implements IDisposable {
      * @param abortSignal An optional signal that can be used to abort the reset.
      */
     public async resetEnvironment(options?: EnvironmentOptions, abortSignal?: AbortSignal): Promise<void> {
+        console.log("resetEnvironment");
         await this._updateEnvironment(undefined, options, abortSignal);
     }
 
@@ -905,7 +907,7 @@ export class Viewer implements IDisposable {
         if (!options.lighting && !options.skybox) {
             return;
         }
-
+        console.log("updateEnvironment");
         const locks: AsyncLock[] = [];
         if (options.lighting) {
             this._loadEnvironmentAbortController?.abort("New environment lighting is being loaded before previous environment lighting finished loading.");
