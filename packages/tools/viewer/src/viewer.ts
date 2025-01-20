@@ -905,6 +905,7 @@ export class Viewer implements IDisposable {
         if (!options.lighting && !options.skybox) {
             return;
         }
+
         const locks: AsyncLock[] = [];
         if (options.lighting) {
             this._loadEnvironmentAbortController?.abort("New environment lighting is being loaded before previous environment lighting finished loading.");
