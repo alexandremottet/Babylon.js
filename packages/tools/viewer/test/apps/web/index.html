@@ -78,7 +78,6 @@
             <babylon-viewer
                 engine="WebGPU"
                 source="https://raw.githubusercontent.com/BabylonJS/Assets/master/meshes/ufo.glb"
-                environment="../../../../../public/@babylonjs/viewer/assets/photoStudio.env"
                 animation-speed="1.5"
                 selected-animation="1"
                 camera-orbit="auto auto auto"
@@ -163,6 +162,8 @@
                 viewerDetails = viewerElement.viewerDetails;
 
                 console.log(`Viewer ready.`, viewerDetails);
+
+                viewerDetails.viewer.loadEnvironment("https://cdn.substance3d.com/v2/files/public/studio-white.env");
             });
             viewerElement.addEventListener("modelchange", (event) => {
                 console.log(`Model changed.`, viewerDetails);
