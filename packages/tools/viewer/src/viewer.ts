@@ -707,6 +707,10 @@ export class Viewer implements IDisposable {
         return this._modelsInfo?.[0] || null;
     }
 
+    protected get _models(): Nullable<Model[]> {
+        return this._modelsInfo ?? [];
+    }
+
     protected _setModel(
         ...args: [model: null] | [model: Model, options?: UpdateModelOptions & Partial<{ source: string | File | ArrayBufferView; interpolateCamera: boolean }>]
     ): void {
