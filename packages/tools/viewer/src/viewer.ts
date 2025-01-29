@@ -2,7 +2,6 @@ import type {
     AbstractEngine,
     AbstractMesh,
     AnimationGroup,
-    AssetContainer,
     AutoRotationBehavior,
     Camera,
     FramingBehavior,
@@ -20,6 +19,7 @@ import type {
 
 import type { MaterialVariantsController } from "loaders/glTF/2.0/Extensions/KHR_materials_variants";
 
+import { AssetContainer } from "core/assetContainer";
 import { ArcRotateCamera } from "core/Cameras/arcRotateCamera";
 import { PointerEventTypes } from "core/Events/pointerEvents";
 import { HemisphericLight } from "core/Lights/hemisphericLight";
@@ -370,7 +370,7 @@ export class Viewer implements IDisposable {
     private readonly _autoRotationBehavior: AutoRotationBehavior;
     private readonly _imageProcessingConfigurationObserver: Observer<ImageProcessingConfiguration>;
     private _renderLoopController: Nullable<IDisposable> = null;
-    private _modelInfo: Nullable<Model> = null;
+    private _modelsInfo: Nullable<Model[]> = null;
     private _skybox: Nullable<Mesh> = null;
     private _skyboxBlur: number = 0.3;
     private _skyboxVisible: boolean = true;
@@ -469,7 +469,7 @@ export class Viewer implements IDisposable {
         this._scene.skipPointerMovePicking = true;
         this._snapshotHelper = new SnapshotRenderingHelper(this._scene, { morphTargetsNumMaxInfluences: 30 });
         this._camera.attachControl();
-        this._updateCamera(); // set default camera values
+        this._updateCamera(this._modelsInfo); // set default camera values
         this._autoRotationBehavior = this._camera.getBehaviorByName("AutoRotation") as AutoRotationBehavior;
 
         // Default to KHR PBR Neutral tone mapping.
@@ -488,7 +488,7 @@ export class Viewer implements IDisposable {
             scene: viewer._scene,
             camera: viewer._camera,
             get model() {
-                return viewer._modelInfo?.assetContainer ?? null;
+                return viewer._model?.assetContainer ?? null;
             },
             suspendRendering: () => this._suspendRendering(),
             pick: (screenX: number, screenY: number) => this._pick(screenX, screenY),
@@ -704,23 +704,23 @@ export class Viewer implements IDisposable {
     }
 
     protected get _model(): Nullable<Model> {
-        return this._modelInfo;
+        return this._modelsInfo?.[0] || null;
     }
 
     protected _setModel(
         ...args: [model: null] | [model: Model, options?: UpdateModelOptions & Partial<{ source: string | File | ArrayBufferView; interpolateCamera: boolean }>]
     ): void {
         const [model, options] = args;
-        if (model !== this._modelInfo) {
-            this._modelInfo = model;
-            this._updateLight();
+        if (model !== this._model) {
+            this._modelsInfo = model ? [model] : null;
+            this._updateLight(this._modelsInfo);
             this._applyAnimationSpeed();
             this._selectAnimation(options?.defaultAnimation ?? 0, false);
             if (options?.animationAutoPlay) {
                 this.playAnimation();
             }
             this.onSelectedMaterialVariantChanged.notifyObservers();
-            this._updateCamera(options?.interpolateCamera);
+            this._updateCamera(this._modelsInfo, options?.interpolateCamera);
             this.onModelChanged.notifyObservers(options?.source ?? null);
         }
     }
@@ -729,7 +729,7 @@ export class Viewer implements IDisposable {
      * The list of animation names for the currently loaded model.
      */
     public get animations(): readonly string[] {
-        return this._modelInfo?.assetContainer.animationGroups.map((group) => group.name) ?? [];
+        return this._model?.assetContainer.animationGroups.map((group) => group.name) ?? [];
     }
 
     /**
@@ -777,7 +777,7 @@ export class Viewer implements IDisposable {
                     }),
                 ];
 
-                this._updateCamera(interpolateCamera);
+                this._updateCamera(this._modelsInfo, interpolateCamera);
             }
 
             this.onSelectedAnimationChanged.notifyObservers();
@@ -824,27 +824,27 @@ export class Viewer implements IDisposable {
     }
 
     private get _activeAnimation(): Nullable<AnimationGroup> {
-        return this._modelInfo?.assetContainer.animationGroups[this._selectedAnimation] ?? null;
+        return this._model?.assetContainer.animationGroups[this._selectedAnimation] ?? null;
     }
 
     /**
      * The list of material variant names for the currently loaded model.
      */
     public get materialVariants(): readonly string[] {
-        return this._modelInfo?.materialVariantsController?.variants ?? [];
+        return this._model?.materialVariantsController?.variants ?? [];
     }
 
     /**
      * The currently selected material variant.
      */
     public get selectedMaterialVariant(): Nullable<string> {
-        return this._modelInfo?.materialVariantsController?.selectedVariant ?? null;
+        return this._model?.materialVariantsController?.selectedVariant ?? null;
     }
 
     public set selectedMaterialVariant(value: string) {
-        if (value !== this.selectedMaterialVariant && this._modelInfo?.materialVariantsController?.variants.includes(value)) {
+        if (value !== this.selectedMaterialVariant && this._model?.materialVariantsController?.variants.includes(value)) {
             this._snapshotHelper.disableSnapshotRendering();
-            this._modelInfo.materialVariantsController.selectedVariant = value;
+            this._model.materialVariantsController.selectedVariant = value;
             this._snapshotHelper.enableSnapshotRendering();
             this.onSelectedMaterialVariantChanged.notifyObservers();
         }
@@ -1085,7 +1085,7 @@ export class Viewer implements IDisposable {
                     });
                 }
 
-                this._updateLight();
+                this._updateLight(this._modelsInfo);
                 this.onEnvironmentChanged.notifyObservers();
             } catch (e) {
                 dispose();
@@ -1167,7 +1167,7 @@ export class Viewer implements IDisposable {
      * @returns true if hotspot found
      */
     public getHotSpotToRef(query: Readonly<ViewerHotSpotQuery>, result: ViewerHotSpotResult): boolean {
-        return this._modelInfo?.getHotSpotToRef(query, result) ?? false;
+        return this._model?.getHotSpotToRef(query, result) ?? false;
     }
 
     protected _getHotSpotToRef(assetContainer: Nullable<AssetContainer>, query: Readonly<ViewerHotSpotQuery>, result: ViewerHotSpotResult): boolean {
@@ -1264,7 +1264,7 @@ export class Viewer implements IDisposable {
         }
     }
 
-    private _updateCamera(interpolate = false): void {
+    protected _updateCamera(models: Nullable<Model[]>, interpolate = false): void {
         this._camera.useFramingBehavior = true;
         const framingBehavior = this._camera.getBehaviorByName("Framing") as FramingBehavior;
         framingBehavior.framingTime = 0;
@@ -1282,11 +1282,21 @@ export class Viewer implements IDisposable {
         let goalRadius = 1;
         let goalTarget = currentTarget;
 
-        if (this._modelInfo?.assetContainer.meshes.length) {
+        if (!models) {
+            return;
+        }
+
+        // Group all meshes from all models
+        const meshes = models.reduce((meshes: AbstractMesh[], model: Model) => {
+            meshes.push(...model.assetContainer.meshes);
+            return meshes;
+        }, [] as AbstractMesh[]);
+
+        if (meshes.length) {
             // get bounds and prepare framing/camera radius from its values
             this._camera.lowerRadiusLimit = null;
 
-            const maxExtents = computeMaxExtents(this._modelInfo.assetContainer.meshes, this._activeAnimation);
+            const maxExtents = computeMaxExtents(meshes, this._activeAnimation);
             const worldExtents = {
                 min: new Vector3(Math.min(...maxExtents.map((e) => e.minimum.x)), Math.min(...maxExtents.map((e) => e.minimum.y)), Math.min(...maxExtents.map((e) => e.minimum.z))),
                 max: new Vector3(Math.max(...maxExtents.map((e) => e.maximum.x)), Math.max(...maxExtents.map((e) => e.maximum.y)), Math.max(...maxExtents.map((e) => e.maximum.z))),
@@ -1329,15 +1339,22 @@ export class Viewer implements IDisposable {
         updateSkybox(this._skybox, this._camera);
     }
 
-    private _updateLight() {
+    protected _updateLight(models: Nullable<Model[]>): void {
         let shouldHaveDefaultLight: boolean;
-        if (!this._modelInfo) {
+        if (!models || models?.length === 0) {
             shouldHaveDefaultLight = false;
         } else {
-            const hasModelProvidedLights = this._modelInfo.assetContainer.lights.length > 0;
+            // Group all meshes from all models
+            const container = models.reduce((container: AssetContainer, model: Model) => {
+                container.lights.push(...model.assetContainer.lights);
+                container.materials.push(...model.assetContainer.materials);
+                return container;
+            }, new AssetContainer());
+
+            const hasModelProvidedLights = container.lights.length > 0;
             const hasImageBasedLighting = !!this._reflectionTexture;
-            const hasMaterials = this._modelInfo.assetContainer.materials.length > 0;
-            const hasNonPBRMaterials = this._modelInfo.assetContainer.materials.some((material) => !(material instanceof PBRMaterial));
+            const hasMaterials = container.materials.length > 0;
+            const hasNonPBRMaterials = container.materials.some((material) => !(material instanceof PBRMaterial));
 
             if (hasModelProvidedLights) {
                 shouldHaveDefaultLight = false;
@@ -1357,13 +1374,13 @@ export class Viewer implements IDisposable {
     }
 
     private _applyAnimationSpeed() {
-        this._modelInfo?.assetContainer.animationGroups.forEach((group) => (group.speedRatio = this._animationSpeed));
+        this._model?.assetContainer.animationGroups.forEach((group) => (group.speedRatio = this._animationSpeed));
     }
 
     protected async _pick(screenX: number, screenY: number): Promise<Nullable<PickingInfo>> {
         await import("core/Culling/ray");
-        if (this._modelInfo) {
-            const model = this._modelInfo?.assetContainer;
+        if (this._model) {
+            const model = this._model?.assetContainer;
             // Refresh bounding info to ensure morph target and skeletal animations are taken into account.
             model.meshes.forEach((mesh) => {
                 let cache = this._meshDataCache.get(mesh);
