@@ -447,7 +447,7 @@ export class Viewer implements IDisposable {
             camera.useInputToRestoreState = false;
 
             scene.onPointerObservable.add(async (pointerInfo) => {
-                const pickingInfo = await this._pick(pointerInfo.event.offsetX, pointerInfo.event.offsetY);
+                const pickingInfo = await this._pick(this._modelsInfo, pointerInfo.event.offsetX, pointerInfo.event.offsetY);
                 if (pickingInfo?.pickedPoint) {
                     const distance = pickingInfo.pickedPoint.subtract(camera.position).dot(camera.getForwardRay().direction);
                     // Immediately reset the target and the radius based on the distance to the picked point.
@@ -491,7 +491,7 @@ export class Viewer implements IDisposable {
                 return viewer._model?.assetContainer ?? null;
             },
             suspendRendering: () => this._suspendRendering(),
-            pick: (screenX: number, screenY: number) => this._pick(screenX, screenY),
+            pick: (screenX: number, screenY: number) => this._pick(this._modelsInfo, screenX, screenY),
         });
     }
 
@@ -1381,12 +1381,17 @@ export class Viewer implements IDisposable {
         this._model?.assetContainer.animationGroups.forEach((group) => (group.speedRatio = this._animationSpeed));
     }
 
-    protected async _pick(screenX: number, screenY: number): Promise<Nullable<PickingInfo>> {
+    protected async _pick(models: Nullable<Model[]>, screenX: number, screenY: number): Promise<Nullable<PickingInfo>> {
         await import("core/Culling/ray");
-        if (this._model) {
-            const model = this._model?.assetContainer;
+        if (models) {
+            // Group all meshes from all models
+            const meshes = models.reduce((meshes: AbstractMesh[], model: Model) => {
+                meshes.push(...model.assetContainer.meshes);
+                return meshes;
+            }, [] as AbstractMesh[]);
+
             // Refresh bounding info to ensure morph target and skeletal animations are taken into account.
-            model.meshes.forEach((mesh) => {
+            meshes.forEach((mesh) => {
                 let cache = this._meshDataCache.get(mesh);
                 if (!cache) {
                     cache = {};
@@ -1395,7 +1400,7 @@ export class Viewer implements IDisposable {
                 mesh.refreshBoundingInfo({ applyMorph: true, applySkeleton: true, cache });
             });
 
-            const pickingInfo = this._scene.pick(screenX, screenY, (mesh) => model.meshes.includes(mesh));
+            const pickingInfo = this._scene.pick(screenX, screenY, (mesh) => meshes.includes(mesh));
             if (pickingInfo.hit) {
                 return pickingInfo;
             }
