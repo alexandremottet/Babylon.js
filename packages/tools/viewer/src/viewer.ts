@@ -882,7 +882,7 @@ export class Viewer implements IDisposable {
         const isWebGPU = this._scene.getEngine().isWebGPU;
         // eslint-disable-next-line no-console
         console.log("isWebGPU", isWebGPU, value.type);
-        if (!value.type || (isWebGPU && value.type === "environment")) {
+        if (!value.type) {
             if (this._shadowGenerator) {
                 // eslint-disable-next-line no-console
                 console.log("dispose classic shadow");
