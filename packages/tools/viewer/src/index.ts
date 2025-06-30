@@ -10,6 +10,7 @@ export type {
     ViewerDetails,
     ViewerHotSpotQuery,
     ViewerOptions,
+    ViewerBoundingInfo,
 } from "./viewer";
 export type { CanvasViewerOptions } from "./viewerFactory";
 export type { ViewerElementEventMap } from "./viewerElement";

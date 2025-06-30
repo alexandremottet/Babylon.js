@@ -223,13 +223,23 @@ function updateSkybox(skybox: Nullable<Mesh>, camera: Camera): void {
     skybox?.scaling.setAll((camera.maxZ - camera.minZ) / 2);
 }
 
-function computeModelsMaxExtents(models: readonly Model[]): Array<{ minimum: Vector3; maximum: Vector3 }> {
+/**
+ * Computes the maximum extents of all the Model's meshes, considering the selected animation.
+ * @param models The models to consider when computing the maximum extents.
+ * @returns An array of objects containing the minimum and maximum extents.
+ */
+export function computeModelsMaxExtents(models: readonly Model[]): Array<{ minimum: Vector3; maximum: Vector3 }> {
     return models.flatMap((model) => {
         return computeMaxExtents(model.assetContainer.meshes, model.assetContainer.animationGroups[model.selectedAnimation]);
     });
 }
 
-function reduceMeshesExtendsToBoundingInfo(maxExtents: Array<{ minimum: Vector3; maximum: Vector3 }>) {
+/**
+ * Computes the bounding info for the meshes' maximum extents.
+ * @param maxExtents The maximum extents to use.
+ * @returns The computed bounding info.
+ */
+export function reduceMeshesExtendsToBoundingInfo(maxExtents: Array<{ minimum: Vector3; maximum: Vector3 }>) {
     if (maxExtents.length === 0) {
         return null;
     }
@@ -254,7 +264,7 @@ function reduceMeshesExtendsToBoundingInfo(maxExtents: Array<{ minimum: Vector3;
  * @param models The models to consider when computing the bounding info
  * @returns The computed bounding info for the models or null
  */
-function computeModelsBoundingInfos(models: readonly Model[]): Nullable<ViewerBoundingInfo> {
+export function computeModelsBoundingInfos(models: readonly Model[]): Nullable<ViewerBoundingInfo> {
     const maxExtents = computeModelsMaxExtents(models);
     return reduceMeshesExtendsToBoundingInfo(maxExtents);
 }
